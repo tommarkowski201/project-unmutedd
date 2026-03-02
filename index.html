@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Unmuted | Analytics Build</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #fdfcfb; --card: #ffffff; --text: #1e293b; --secondary: #64748b;
+            --gold: #d4af37; --danger: #f43f5e; --accent: #10b981; --admin: #4f46e5;
+            --staff-bg: #eef2ff;
+        }
+        body { margin: 0; font-family: 'Outfit', sans-serif; background: var(--bg); color: var(--text); display: flex; min-height: 100vh; }
+        
+        /* ANALYTICS TABLE */
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.85rem; }
+        th, td { text-align: left; padding: 10px; border-bottom: 1px solid #e2e8f0; }
+        th { color: var(--secondary); font-weight: 600; }
+
+        /* ENGAGEMENT */
+        .engagement-bar { display: flex; gap: 15px; margin-top: 10px; }
+        .love-btn { cursor: pointer; border: none; background: #fff1f2; color: var(--danger); padding: 5px 12px; border-radius: 20px; font-weight: 600; font-size: 0.8rem; display: flex; align-items: center; gap: 5px; }
+        .reply-box { margin-top: 10px; padding-left: 15px; border-left: 2px solid #f1f5f9; }
+        .reply-pill { font-size: 0.8rem; background: #f8fafc; padding: 8px; border-radius: 10px; margin-bottom: 5px; border: 1px solid #f1f5f9; }
+        .staff-reply { background: var(--staff-bg); border-left: 3px solid var(--admin); }
+
+        /* LAYOUT CORE */
+        #sos-sidebar { width: 70px; background: var(--danger); color: white; display: flex; align-items: center; justify-content: center; cursor: pointer; position: fixed; left: 0; top: 0; bottom: 0; z-index: 5000; }
+        #app-shell { margin-left: 70px; width: calc(100% - 70px); }
+        .screen { display: none; width: 100%; padding: 30px; box-sizing: border-box; animation: fadeIn 0.3s ease; padding-bottom: 100px; }
+        .glass-card { background: var(--card); padding: 20px; border-radius: 20px; border: 1px solid #f1f5f9; box-shadow: 0 4px 15px rgba(0,0,0,0.02); margin-bottom: 20px; }
+        
+        input, textarea { width: 100%; padding: 12px; margin: 8px 0; border-radius: 12px; border: 1px solid #e2e8f0; font-family: inherit; }
+        button { cursor: pointer; border: none; border-radius: 12px; font-weight: 600; padding: 10px 18px; }
+        .btn-admin { background: var(--admin); color: white; }
+        nav { position: fixed; bottom: 0; left: 70px; right: 0; background: white; padding: 15px; border-top: 1px solid #eee; display: none; justify-content: space-around; z-index: 4000; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+<div id="sos-sidebar" onclick="triggerSOS()"><div style="transform: rotate(-90deg); font-weight: 800;">HELP NOW</div></div>
+
+<div id="app-shell">
+    <div id="screen-gate" class="screen" style="display: flex; justify-content: center; align-items: center; height: 100vh;">
+        <div class="glass-card" style="max-width: 350px; text-align: center; width: 100%;">
+            <h1 style="color:var(--admin)">Project Unmuted</h1>
+            <input type="number" id="loginID" placeholder="School ID" oninput="checkLogin()">
+            <div id="pass-field" style="display:none"><input type="password" id="uPass" placeholder="Password"></div>
+            <div id="setup-field" style="display:none">
+                <input type="text" id="uName" placeholder="Ghost Alias">
+                <input type="password" id="nPass" placeholder="Set Password">
+            </div>
+            <button style="background:var(--gold); color:white; width:100%; margin-top:10px;" onclick="auth()">Enter Portal</button>
+        </div>
+    </div>
+
+    <div id="screen-staff" class="screen">
+        <h2>Command Hub</h2>
+        <div class="glass-card" style="background:var(--staff-bg)">
+            <h3>📊 Resource Analytics</h3>
+            <table id="analytics-table">
+                <thead><tr><th>Resource Name</th><th>Date Added</th><th>Downloads</th></tr></thead>
+                <tbody id="analytics-body"></tbody>
+            </table>
+        </div>
+        <div class="glass-card">
+            <h3>📂 Upload PDF</h3>
+            <input type="text" id="libTitle" placeholder="File Label">
+            <input type="file" id="libFile" accept=".pdf">
+            <button class="btn-admin" onclick="uploadPDF()">Add to Library</button>
+        </div>
+    </div>
+
+    <div id="screen-feed" class="screen">
+        <div class="glass-card" style="background:var(--admin); color:white;">
+            <small>SCHOOL SHOUTOUT</small><div id="shout-content">Welcome to the new build.</div>
+        </div>
+        <h2>Community Wall</h2>
+        <div id="global-feed"></div>
+    </div>
+
+    <div id="screen-lib" class="screen"><h2>Library</h2><div id="library-list"></div></div>
+    <div id="screen-wall" class="screen"><div class="glass-card"><h3>Vent</h3><textarea id="vIn"></textarea><button class="btn-admin" onclick="postVent()">Post Anonymously</button></div></div>
+
+    <nav id="nav-bar">
+        <button onclick="nav('feed')">Wall</button>
+        <button onclick="nav('lib')">Library</button>
+        <button id="nav-staff" onclick="nav('staff')" style="display:none; color:var(--admin)">Hub</button>
+        <button onclick="nav('wall')">Vent</button>
+        <button onclick="location.reload()">Logout</button>
+    </nav>
+</div>
+
+<script>
+    const STAFF = { "888": "Counselor", "777": "Security Specialist" };
+    let db_u = JSON.parse(localStorage.getItem('unmuted_u_v100') || "{}");
+    let db_p = JSON.parse(localStorage.getItem('unmuted_p_v100') || "[]");
+    let db_l = JSON.parse(localStorage.getItem('unmuted_l_v100') || "[]");
+    
+    let currID = null, currRole = 'STUDENT';
+
+    function checkLogin() {
+        let id = document.getElementById('loginID').value;
+        if(db_u[id]) document.getElementById('pass-field').style.display='block';
+        else if(id.length >= 3) document.getElementById('setup-field').style.display='block';
+    }
+
+    function auth() {
+        let id = document.getElementById('loginID').value;
+        if(db_u[id]) { if(document.getElementById('uPass').value === db_u[id].p) login(id); }
+        else {
+            let n = document.getElementById('uName').value, p = document.getElementById('nPass').value;
+            db_u[id] = { p, n, loveReceived: 0 };
+            localStorage.setItem('unmuted_u_v100', JSON.stringify(db_u)); login(id);
+        }
+    }
+
+    function login(id) {
+        currID = id; currRole = STAFF[id] ? 'STAFF' : 'STUDENT';
+        document.getElementById('nav-staff').style.display = currRole === 'STAFF' ? 'block' : 'none';
+        document.getElementById('nav-bar').style.display = 'flex';
+        nav('feed');
+    }
+
+    function uploadPDF() {
+        const title = document.getElementById('libTitle').value;
+        const file = document.getElementById('libFile').files[0];
+        if(!title || !file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            db_l.push({ id: Date.now(), title, data: e.target.result, date: new Date().toLocaleDateString(), downloads: 0 });
+            localStorage.setItem('unmuted_l_v100', JSON.stringify(db_l));
+            render();
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function trackDownload(id) {
+        let res = db_l.find(r => r.id === id);
+        res.downloads++;
+        localStorage.setItem('unmuted_l_v100', JSON.stringify(db_l));
+        render();
+    }
+
+    function postVent() {
+        const text = document.getElementById('vIn').value;
+        if(!text) return;
+        db_p.unshift({ id: Date.now(), text, likes: 0, replies: [] });
+        localStorage.setItem('unmuted_p_v100', JSON.stringify(db_p));
+        document.getElementById('vIn').value = ""; nav('feed');
+    }
+
+    function likePost(id) {
+        let post = db_p.find(p => p.id === id);
+        post.likes++;
+        localStorage.setItem('unmuted_p_v100', JSON.stringify(db_p));
+        render();
+    }
+
+    function replyPost(id) {
+        const input = document.getElementById(`reply-input-${id}`);
+        if(!input.value) return;
+        let post = db_p.find(p => p.id === id);
+        post.replies.push({ text: input.value, author: currRole === 'STAFF' ? STAFF[currID] : '@Anonymous', isStaff: currRole === 'STAFF' });
+        localStorage.setItem('unmuted_p_v100', JSON.stringify(db_p));
+        input.value = ""; render();
+    }
+
+    function render() {
+        // Analytics
+        document.getElementById('analytics-body').innerHTML = db_l.map(l => `<tr><td>${l.title}</td><td>${l.date}</td><td><b>${l.downloads}</b></td></tr>`).join("");
+        
+        // Library
+        document.getElementById('library-list').innerHTML = db_l.map(l => `
+            <div class="glass-card" style="display:flex; justify-content:space-between; align-items:center;">
+                <div><b>${l.title}</b></div>
+                <a href="${l.data}" download="${l.title}.pdf" class="btn-admin" style="text-decoration:none" onclick="trackDownload(${l.id})">View PDF</a>
+            </div>`).join("");
+
+        // Wall
+        document.getElementById('global-feed').innerHTML = db_p.map(p => `
+            <div class="glass-card">
+                <small>@Anonymous</small>
+                <p>${p.text}</p>
+                <div class="engagement-bar">
+                    <button class="love-btn" onclick="likePost(${p.id})">❤️ ${p.likes}</button>
+                </div>
+                <div class="reply-box">
+                    ${p.replies.map(r => `<div class="reply-pill ${r.isStaff?'staff-reply':''}"><b>${r.author}:</b> ${r.text}</div>`).join("")}
+                    <div style="display:flex; gap:10px; margin-top:10px;">
+                        <input type="text" id="reply-input-${p.id}" placeholder="Type a reply..." style="padding:8px;">
+                        <button class="btn-admin" onclick="replyPost(${p.id})">Post</button>
+                    </div>
+                </div>
+            </div>`).join("");
+    }
+
+    function nav(id) { document.querySelectorAll('.screen').forEach(s => s.style.display='none'); document.getElementById('screen-'+id).style.display = 'block'; render(); }
+    function triggerSOS() { if(confirm("SOS?")) window.location.href="tel:988"; }
+</script>
+</body>
+</html>
